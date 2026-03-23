@@ -5,8 +5,8 @@
 [![npm downloads](https://img.shields.io/npm/dm/@zakkster/lite-gradient?style=for-the-badge&color=blue)](https://www.npmjs.com/package/@zakkster/lite-gradient)
 [![npm total downloads](https://img.shields.io/npm/dt/@zakkster/lite-gradient?style=for-the-badge&color=blue)](https://www.npmjs.com/package/@zakkster/lite-gradient)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Types-informational)
-![lite-color](https://img.shields.io/npm/dependency-version/@zakkster/lite-gradient/@zakkster/lite-color)
-![lite-lerp](https://img.shields.io/npm/dependency-version/@zakkster/lite-gradient/@zakkster/lite-lerp)
+![lite-color](https://img.shields.io/npm/dependency-version/@zakkster/lite-color)
+![lite-lerp](https://img.shields.io/npm/dependency-version/@zakkster/lite-lerp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 ## 🎬 Live Demo (SmartObserver)
