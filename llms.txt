@@ -1,0 +1,29 @@
+# @zakkster/lite-gradient
+> Zero-GC OKLCH gradient generator. N-stop perceptually uniform gradients.
+
+## Install
+npm i @zakkster/lite-gradient
+
+## Import
+import { Gradient, gradientSunset, gradientFire } from '@zakkster/lite-gradient';
+
+## Key Facts
+- N-stop OKLCH gradients (perceptually uniform, no gray dead zones)
+- at(t, out): caller-owned output object (zero-GC)
+- css(t): CSS oklch() string (allocates — use for setup)
+- palette(count): array of CSS color strings
+- sampleArray(out, count): fill Float32Array LUT (zero-GC)
+- toLinear(ctx, x0,y0,x1,y1): Canvas2D linear gradient
+- toRadial(ctx, cx,cy,r): Canvas2D radial gradient
+- toCssLinear(angle?), toCssRadial(): CSS gradient strings
+- 5 presets: Sunset, Ocean, Fire, Neon, Grey
+- Dependencies: @zakkster/lite-color, @zakkster/lite-lerp
+
+## Usage
+const g = new Gradient([
+    { l: 0.3, c: 0.15, h: 270 },
+    { l: 0.9, c: 0.12, h: 60 },
+]);
+const out = { l: 0, c: 0, h: 0 };
+g.at(0.5, out); // zero-GC sampling
+const css = g.css(0.5); // setup only

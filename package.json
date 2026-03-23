@@ -1,0 +1,51 @@
+{
+  "name": "@zakkster/lite-gradient",
+  "version": "1.0.0",
+  "description": "Zero-GC OKLCH gradient generator. N-stop perceptually uniform gradients for canvas and CSS.",
+  "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "Gradient.js",
+  "types": "Gradient.d.ts",
+  "exports": {
+    ".": {
+      "import": "./Gradient.js",
+      "types": "./Gradient.d.ts"
+    }
+  },
+  "files": [
+    "Gradient.js",
+    "Gradient.d.ts",
+    "llms.txt"
+  ],
+  "keywords": [
+    "gradient",
+    "oklch",
+    "color",
+    "palette",
+    "canvas",
+    "css",
+    "perceptual",
+    "zero-gc"
+  ],
+  "sideEffects": false,
+  "homepage": "https://github.com/PeshoVurtoleta/lite-gradient#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeshoVurtoleta/lite-gradient.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PeshoVurtoleta/lite-gradient/issues",
+    "email": "shinikchiev@yahoo.com"
+  },
+  "dependencies": {
+    "@zakkster/lite-color": "^1.0.0",
+    "@zakkster/lite-lerp": "^1.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}
