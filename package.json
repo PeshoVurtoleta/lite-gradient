@@ -1,6 +1,6 @@
 {
   "name": "@zakkster/lite-gradient",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Zero-GC OKLCH gradient generator. N-stop perceptually uniform gradients for canvas and CSS.",
   "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
   "license": "MIT",
