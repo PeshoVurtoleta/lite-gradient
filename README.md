@@ -8,7 +8,7 @@
 ![Dependencies](https://img.shields.io/badge/dependencies-2-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## 🎬 Live Demo (Graient)
+## 🎬 Live Demo (Gradient)
 https://cdpn.io/pen/debug/QwKqXKP
 
 ## 🌈 What is lite-gradient?
