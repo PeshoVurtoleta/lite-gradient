@@ -16,7 +16,7 @@
  *             @zakkster/lite-lerp  (clamp)
  */
 
-import { lerpOklch, toCssOklch } from '@zakkster/lite-color';
+import { lerpOklchTo, toCssOklch } from '@zakkster/lite-color';
 import { clamp } from '@zakkster/lite-lerp';
 
 /**
@@ -72,6 +72,7 @@ export class Gradient {
     /**
      * Sample the gradient at position t into a caller-owned output object.
      * ZERO-GC: The caller allocates and owns the { l, c, h } object.
+     * No intermediate objects are created.
      *
      * @param {number} t Position 0–1
      * @param {{ l: number, c: number, h: number }} out Pre-allocated output
@@ -96,8 +97,8 @@ export class Gradient {
             if (t >= stops[i].pos && t <= stops[i + 1].pos) {
                 const range = stops[i + 1].pos - stops[i].pos;
                 const localT = range > 0 ? (t - stops[i].pos) / range : 0;
-                const result = lerpOklch(stops[i], stops[i + 1], localT);
-                out.l = result.l; out.c = result.c; out.h = result.h;
+                // Zero-GC: writes directly into `out`, no intermediate object
+                lerpOklchTo(stops[i], stops[i + 1], localT, out);
                 return out;
             }
         }
