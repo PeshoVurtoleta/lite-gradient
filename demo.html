@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@zakkster/lite-gradient — OKLCH Gradient Playground</title>
+    <script type="importmap">
+{
+  "imports": {
+    "@zakkster/lite-color": "https://esm.sh/@zakkster/lite-color@1.0.6",
+    "@zakkster/lite-lerp": "https://esm.sh/@zakkster/lite-lerp@1.0.7"
+  }
+}
+
+
+    </script>
+
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+        }
+
+        :root {
+            --bg: #0c0c10;
+            --surface: #16161c;
+            --border: #2a2a36;
+            --text: #e8e6f0;
+            --dim: #8886a0;
+            --accent: oklch(0.75 0.2 160);
+            --radius: 12px;
+            --font: 'DM Sans', sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, oklch(0.7 0.22 270), oklch(0.8 0.25 330), oklch(0.9 0.15 60));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.3rem;
+        }
+
+        header p {
+            color: var(--dim);
+            font-size: 0.95rem;
+        }
+
+        header code {
+            font-family: var(--mono);
+            color: var(--accent);
+            font-size: 0.85rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .card:hover {
+            border-color: #444;
+        }
+
+        .card-header {
+            padding: 1rem 1.2rem 0.6rem;
+        }
+
+        .card-header h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .card-header p {
+            font-size: 0.8rem;
+            color: var(--dim);
+        }
+
+        .card-body {
+            padding: 0 1.2rem 1.2rem;
+        }
+
+        canvas {
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .preview-strip {
+            width: 100%;
+            height: 48px;
+            border-radius: 8px;
+            margin-top: 0.8rem;
+        }
+
+        .palette-row {
+            display: flex;
+            gap: 4px;
+            margin-top: 0.8rem;
+        }
+
+        .swatch {
+            flex: 1;
+            height: 40px;
+            border-radius: 6px;
+            position: relative;
+            transition: transform 0.15s;
+            cursor: pointer;
+        }
+
+        .swatch:hover {
+            transform: scaleY(1.3);
+            z-index: 1;
+        }
+
+        .swatch-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--dim);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .swatch:hover .swatch-label {
+            opacity: 1;
+        }
+
+        .full-span {
+            grid-column: 1 / -1;
+        }
+
+        .stops-editor {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.8rem;
+        }
+
+        .stop-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: #1e1e28;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--dim);
+        }
+
+        .stop-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-top: 0.6rem;
+        }
+
+        .slider-row label {
+            font-size: 0.8rem;
+            color: var(--dim);
+            min-width: 70px;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+            height: 4px;
+        }
+
+        .slider-row .val {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--dim);
+            min-width: 30px;
+        }
+
+        .code-block {
+            background: #111118;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            margin-top: 0.8rem;
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            line-height: 1.7;
+            color: #c8c6d8;
+        }
+
+        .code-block .kw {
+            color: oklch(0.7 0.15 300);
+        }
+
+        .code-block .str {
+            color: oklch(0.8 0.18 140);
+        }
+
+        .code-block .num {
+            color: oklch(0.8 0.15 60);
+        }
+
+        .code-block .fn {
+            color: oklch(0.75 0.2 200);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #222;
+            border-color: #555;
+        }
+
+        .btn.active {
+            background: oklch(0.3 0.1 160);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        #cursorInfo {
+            position: fixed;
+            pointer-events: none;
+            padding: 4px 10px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #333;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text);
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 100;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 4rem;
+            color: var(--dim);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>@zakkster/lite-gradient</h1>
+    <p>Zero-GC OKLCH gradient generator — perceptually uniform, canvas + CSS ready</p>
+    <code>npm i @zakkster/lite-gradient</code>
+</header>
+
+<div id="app" class="loader">Loading modules from jsdelivr…</div>
+<div id="cursorInfo"></div>
+
+<script type="module">
+    // ═══════════════════════════════════════════════════════════
+    //  NPM MODULE IMPORTS (real published packages)
+    // ═══════════════════════════════════════════════════════════
+    import {lerp, clamp} from '@zakkster/lite-lerp';
+    import {toCssOklch, lerpOklch} from '@zakkster/lite-color';
+
+    // ═══════════════════════════════════════════════════════════
+    //  INLINE: lite-gradient (until published to npm)
+    //  Once published, replace with:
+    import {Gradient} from 'https://cdn.jsdelivr.net/npm/@zakkster/lite-gradient';
+    // ═══════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════
+    //  PRESET GRADIENTS
+    // ═══════════════════════════════════════════════════════════
+
+    const PRESETS = {
+        Sunset: [
+            {l: 0.3, c: 0.15, h: 270},
+            {l: 0.55, c: 0.25, h: 330},
+            {l: 0.85, c: 0.15, h: 60},
+        ],
+        Ocean: [
+            {l: 0.25, c: 0.12, h: 220},
+            {l: 0.5, c: 0.18, h: 195},
+            {l: 0.9, c: 0.04, h: 190},
+        ],
+        Fire: [
+            {l: 0.1, c: 0.01, h: 0},
+            {l: 0.4, c: 0.25, h: 25},
+            {l: 0.65, c: 0.24, h: 50},
+            {l: 0.85, c: 0.18, h: 85},
+            {l: 0.97, c: 0.02, h: 90},
+        ],
+        Neon: [
+            {l: 0.5, c: 0.25, h: 250},
+            {l: 0.6, c: 0.3, h: 310},
+            {l: 0.7, c: 0.25, h: 350},
+        ],
+        Aurora: [
+            {l: 0.15, c: 0.05, h: 260},
+            {l: 0.45, c: 0.22, h: 160},
+            {l: 0.65, c: 0.2, h: 130},
+            {l: 0.4, c: 0.18, h: 280},
+        ],
+        Peach: [
+            {l: 0.92, c: 0.08, h: 80},
+            {l: 0.82, c: 0.14, h: 40},
+            {l: 0.75, c: 0.18, h: 15},
+        ],
+        Acid: [
+            {l: 0.1, c: 0.02, h: 0},
+            {l: 0.7, c: 0.32, h: 140},
+            {l: 0.95, c: 0.18, h: 100},
+        ],
+        Midnight: [
+            {l: 0.08, c: 0.04, h: 270},
+            {l: 0.2, c: 0.12, h: 250},
+            {l: 0.35, c: 0.08, h: 230},
+            {l: 0.12, c: 0.06, h: 280},
+        ],
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    //  APP STATE
+    // ═══════════════════════════════════════════════════════════
+
+    let activePreset = 'Sunset';
+    let gradient = new Gradient(PRESETS[activePreset]);
+    let angle = 135;
+    let paletteCount = 8;
+
+    const cursor = document.getElementById('cursorInfo');
+    const out = {l: 0, c: 0, h: 0};
+
+    // ═══════════════════════════════════════════════════════════
+    //  RENDER
+    // ═══════════════════════════════════════════════════════════
+
+    function render() {
+        gradient = new Gradient(PRESETS[activePreset]);
+
+        const app = document.getElementById('app');
+        app.className = 'grid';
+        app.innerHTML = '';
+
+        // ── 1. Canvas Linear Gradient ──
+        const card1 = makeCard('Canvas Linear', `toLinear(ctx, 0, 0, w, 0, 32) — 32-stop OKLCH sampling`);
+        const c1 = document.createElement('canvas');
+        c1.height = 240;
+        card1.body.appendChild(c1);
+        requestAnimationFrame(() => {
+            const ctx = c1.getContext('2d');
+            c1.width = c1.offsetWidth * devicePixelRatio;
+            c1.height = 240 * devicePixelRatio;
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+            const w = c1.offsetWidth, h = 240;
+            ctx.fillStyle = gradient.toLinear(ctx, 0, 0, w, 0);
+            ctx.fillRect(0, 0, w, h);
+        });
+        c1.addEventListener('mousemove', (e) => showCursorInfo(e, c1));
+        c1.addEventListener('mouseleave', () => cursor.style.opacity = '0');
+        app.appendChild(card1.el);
+
+        // ── 2. Canvas Radial Gradient ──
+        const card2 = makeCard('Canvas Radial', `toRadial(ctx, cx, cy, r, 32)`);
+        const c2 = document.createElement('canvas');
+        c2.height = 240;
+        card2.body.appendChild(c2);
+        requestAnimationFrame(() => {
+            const ctx = c2.getContext('2d');
+            c2.width = c2.offsetWidth * devicePixelRatio;
+            c2.height = 240 * devicePixelRatio;
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+            const w = c2.offsetWidth, h = 240;
+            ctx.fillStyle = '#0c0c10';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = gradient.toRadial(ctx, w / 2, h / 2, Math.min(w, h) * 0.45);
+            ctx.beginPath();
+            ctx.arc(w / 2, h / 2, Math.min(w, h) * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        c2.addEventListener('mousemove', (e) => showCursorInfo(e, c2));
+        c2.addEventListener('mouseleave', () => cursor.style.opacity = '0');
+        app.appendChild(card2.el);
+
+        // ── 3. CSS Gradient ──
+        const card3 = makeCard('CSS Output', `toCssLinear(${angle}°, 12)`);
+        const strip = document.createElement('div');
+        strip.className = 'preview-strip';
+        strip.style.background = gradient.toCssLinear(angle, 12);
+        strip.style.height = '80px';
+        card3.body.appendChild(strip);
+
+        const sr = makeSlider('Angle', 0, 360, angle, (v) => {
+            angle = v;
+            strip.style.background = gradient.toCssLinear(angle, 12);
+        });
+        card3.body.appendChild(sr);
+
+        const codeEl = document.createElement('div');
+        codeEl.className = 'code-block';
+        codeEl.innerHTML = `<span class="kw">element</span>.style.<span class="fn">background</span> = gradient.<span class="fn">toCssLinear</span>(<span class="num">${angle}</span>);`;
+        card3.body.appendChild(codeEl);
+        app.appendChild(card3.el);
+
+        // ── 4. Palette Extraction ──
+        const card4 = makeCard('Palette', `palette(${paletteCount}) — evenly spaced CSS colors`);
+        const palRow = document.createElement('div');
+        palRow.className = 'palette-row';
+        renderPalette(palRow);
+        card4.body.appendChild(palRow);
+
+        const ps = makeSlider('Count', 3, 16, paletteCount, (v) => {
+            paletteCount = v;
+            renderPalette(palRow);
+        });
+        card4.body.appendChild(ps);
+        app.appendChild(card4.el);
+
+        // ── 5. Stop Editor (full-span) ──
+        const card5 = makeCard('Gradient Stops', `OKLCH color stops — the building blocks`, true);
+        const stopsRow = document.createElement('div');
+        stopsRow.className = 'stops-editor';
+        PRESETS[activePreset].forEach((s, i) => {
+            const chip = document.createElement('div');
+            chip.className = 'stop-chip';
+            const dot = document.createElement('div');
+            dot.className = 'stop-dot';
+            dot.style.background = toCssOklch(s);
+            chip.appendChild(dot);
+            chip.appendChild(document.createTextNode(
+                `L:${s.l.toFixed(2)} C:${s.c.toFixed(2)} H:${Math.round(s.h)}`
+            ));
+            stopsRow.appendChild(chip);
+        });
+        card5.body.appendChild(stopsRow);
+
+        const codeStop = document.createElement('div');
+        codeStop.className = 'code-block';
+        const stopsCode = PRESETS[activePreset].map(s =>
+            `  { <span class="kw">l</span>: <span class="num">${s.l}</span>, <span class="kw">c</span>: <span class="num">${s.c}</span>, <span class="kw">h</span>: <span class="num">${s.h}</span> }`
+        ).join(',\n');
+        codeStop.innerHTML = `<span class="kw">const</span> g = <span class="kw">new</span> <span class="fn">Gradient</span>([\n${stopsCode}\n]);`;
+        card5.body.appendChild(codeStop);
+        app.appendChild(card5.el);
+
+        // ── 6. Zero-GC Sampling Demo (full-span) ──
+        const card6 = makeCard('Zero-GC Sampling', `at(t, out) — caller-owned output, render-loop safe`, true);
+        const c6 = document.createElement('canvas');
+        c6.height = 160;
+        c6.style.height = '160px';
+        card6.body.appendChild(c6);
+
+        let raf;
+        requestAnimationFrame(() => {
+            const ctx = c6.getContext('2d');
+            c6.width = c6.offsetWidth * devicePixelRatio;
+            c6.height = 160 * devicePixelRatio;
+            ctx.scale(devicePixelRatio, devicePixelRatio);
+            const w = c6.offsetWidth, h = 160;
+            const color = {l: 0, c: 0, h: 0};
+
+            function draw() {
+                ctx.clearRect(0, 0, w, h);
+                const t0 = performance.now();
+                const cols = 60;
+                const rows = 8;
+                const cw = w / cols, ch = h / rows;
+
+                for (let r = 0; r < rows; r++) {
+                    const phase = (t0 * 0.0003 + r * 0.12) % 1;
+                    for (let c = 0; c < cols; c++) {
+                        const t = ((c / cols) + phase) % 1;
+                        gradient.at(t, color); // ZERO-GC: writes into pre-allocated color
+                        ctx.fillStyle = toCssOklch(color);
+                        ctx.fillRect(c * cw, r * ch, cw - 1, ch - 1);
+                    }
+                }
+                raf = requestAnimationFrame(draw);
+            }
+
+            draw();
+        });
+        app.appendChild(card6.el);
+
+        // ── Preset buttons at top ──
+        const btnCard = makeCard('Presets', 'Click to explore different OKLCH gradients', true);
+        const btnRow = document.createElement('div');
+        btnRow.className = 'btn-row';
+        for (const name of Object.keys(PRESETS)) {
+            const btn = document.createElement('button');
+            btn.className = `btn${name === activePreset ? ' active' : ''}`;
+            btn.textContent = name;
+            btn.onclick = () => {
+                if (raf) cancelAnimationFrame(raf);
+                activePreset = name;
+                render();
+            };
+            btnRow.appendChild(btn);
+        }
+        btnCard.body.appendChild(btnRow);
+
+        // Insert at the very top
+        app.insertBefore(btnCard.el, app.firstChild);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════════════════════════════
+
+    function makeCard(title, subtitle, fullSpan = false) {
+        const el = document.createElement('div');
+        el.className = `card${fullSpan ? ' full-span' : ''}`;
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.innerHTML = `<h2>${title}</h2><p>${subtitle}</p>`;
+        el.appendChild(header);
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        el.appendChild(body);
+        return {el, body};
+    }
+
+    function makeSlider(label, min, max, val, onChange) {
+        const row = document.createElement('div');
+        row.className = 'slider-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        const inp = document.createElement('input');
+        inp.type = 'range';
+        inp.min = min;
+        inp.max = max;
+        inp.value = val;
+        const valSpan = document.createElement('span');
+        valSpan.className = 'val';
+        valSpan.textContent = val;
+        inp.oninput = () => {
+            valSpan.textContent = inp.value;
+            onChange(+inp.value);
+        };
+        row.append(lbl, inp, valSpan);
+        return row;
+    }
+
+    function renderPalette(container) {
+        container.innerHTML = '';
+        const colors = gradient.palette(paletteCount);
+        colors.forEach(css => {
+            const sw = document.createElement('div');
+            sw.className = 'swatch';
+            sw.style.background = css;
+            const lbl = document.createElement('div');
+            lbl.className = 'swatch-label';
+            lbl.textContent = css.replace('oklch(', '').replace(')', '');
+            sw.appendChild(lbl);
+            sw.onclick = () => navigator.clipboard?.writeText(css);
+            container.appendChild(sw);
+        });
+    }
+
+    function showCursorInfo(e, canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const t = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+        gradient.at(t, out);
+        cursor.style.left = `${e.clientX + 14}px`;
+        cursor.style.top = `${e.clientY - 30}px`;
+        cursor.style.opacity = '1';
+        cursor.style.borderLeftColor = toCssOklch(out);
+        cursor.style.borderLeftWidth = '3px';
+        cursor.innerHTML = `t=${t.toFixed(3)} → L:${out.l.toFixed(2)} C:${out.c.toFixed(2)} H:${Math.round(out.h)}°`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  BOOT
+    // ═══════════════════════════════════════════════════════════
+    render();
+</script>
+</body>
+</html>
