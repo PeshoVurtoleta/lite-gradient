@@ -49,3 +49,19 @@ const css = g.css(0.5); // setup only
 const brand = monochromeGradient({ l: 0.5, c: 0.08, h: 245 });
 ctx.fillStyle = brand.toLinear(ctx, 0, 0, 800, 600);
 ctx.fillRect(0, 0, 800, 600);
+
+// v1.2.0 — closed / cyclic gradients
+const wheel = new Gradient([
+    { l: 0.65, c: 0.18, h: 0 },
+    { l: 0.65, c: 0.18, h: 120 },
+    { l: 0.65, c: 0.18, h: 240 },
+], { closed: true });
+// Default spacing: i/n (period), not i/(n-1) — wrap segment covers [(n-1)/n, 1]
+// at(t): t = t - Math.floor(t) replaces the clamp; raw accumulating phase works directly
+wheel.at(1.5, out); // same as at(0.5)
+wheel.at(-0.25, out); // same as at(0.75)
+// palette(n) / sampleArray(out, n): period spacing i/n (no duplicated endpoint)
+// toCssLinear / toCssRadial: append first color again at 100% so CSS output closes visually
+// toLinear / toRadial: same treatment for CanvasGradient
+// Instance carries `readonly closed: boolean` for downstream consumers to branch on.
+// Open-mode paths byte-identical to v1.1.0; no cost when opts absent.

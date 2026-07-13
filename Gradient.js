@@ -48,18 +48,38 @@ export class Gradient {
     /**
      * @param {Array<{l: number, c: number, h: number, stop?: number}>} stops
      *   OKLCH color stops. Optional `stop` field (0–1) for custom positioning.
-     *   If omitted, stops are evenly distributed.
+     *   If omitted, stops are evenly distributed. In `closed` mode the default
+     *   spacing is `i / n` instead of `i / (n − 1)` — the wrap segment
+     *   (last → first) gets equal width to every other segment.
+     * @param {object} [opts]
+     * @param {boolean} [opts.closed=false]
+     *   Treat the gradient as cyclic. Enables:
+     *     - Period spacing on defaults (`i / n`);
+     *     - Period wrap on `at(t)`: `t = t − Math.floor(t)` replaces the clamp,
+     *       so animation phase can be a raw accumulating float;
+     *     - Wrap segment interpolation `[lastPos, firstPos + 1]`;
+     *     - Period spacing on `palette` / `sampleArray` samples (no duplicated
+     *       endpoint);
+     *     - CSS emitters append the first color again at 100% so linear-gradient
+     *       and radial-gradient close visually.
+     *   Open-mode behavior (default) is unchanged, byte-for-byte, from v1.1.0.
      */
-    constructor(stops) {
+    constructor(stops, opts) {
         if (!stops || stops.length < 2) {
             throw new Error('Gradient requires at least 2 stops');
         }
+        this.closed = opts != null && opts.closed === true;
 
+        // Default spacing depends on closed:
+        //   open   → i / (n − 1)   endpoints at 0 and 1
+        //   closed → i / n         period spacing; wrap covers [(n−1)/n, 1]
+        const n = stops.length;
+        const denom = this.closed ? n : (n - 1);
         this.stops = stops.map((s, i) => ({
             l: s.l,
             c: s.c,
             h: s.h,
-            pos: s.stop !== undefined ? s.stop : i / (stops.length - 1),
+            pos: s.stop !== undefined ? s.stop : i / denom,
         }));
 
         // Sort by position
@@ -74,26 +94,67 @@ export class Gradient {
      * ZERO-GC: The caller allocates and owns the { l, c, h } object.
      * No intermediate objects are created.
      *
-     * @param {number} t Position 0–1
+     * @param {number} t Position 0–1 (open mode: clamped; closed mode: wrapped
+     *   via `t − Math.floor(t)`, so any float is valid).
      * @param {{ l: number, c: number, h: number }} out Pre-allocated output
      * @returns {{ l: number, c: number, h: number }} Same `out` reference
      */
     at(t, out) {
-        t = clamp(t, 0, 1);
         const stops = this.stops;
+        const n = stops.length;
 
-        if (t <= stops[0].pos) {
-            out.l = stops[0].l; out.c = stops[0].c; out.h = stops[0].h;
-            return out;
+        if (this.closed) {
+            // Period wrap — replaces the open-mode clamp. `at(1.5)` and
+            // `at(0.5)` yield the same color. Negative `t` wraps too:
+            // Math.floor(-0.25) = -1, so t becomes 0.75.
+            t = t - Math.floor(t);
+            // ...but `t - Math.floor(t)` is NOT guaranteed to land in [0, 1).
+            // For any tiny negative t (|t| < ~1.1e-16), `t - (-1)` rounds to
+            // exactly 1.0 in float64. That falls into the wrap segment at
+            // localT === 1, which returns the right colour but expresses its hue
+            // as 360 rather than 0 — outside the canonical [0, 360) range, and
+            // enough to break any consumer that divides by 360 or indexes on it.
+            // An accumulating phase drifting a hair below zero is a documented
+            // input here, so fold 1.0 back to 0. NaN is left alone: it falls
+            // through the segment loop and returns `out` untouched, as before.
+            if (t >= 1) t = 0;
+
+            const first = stops[0];
+            const last = stops[n - 1];
+
+            // Wrap segment spans [lastPos, firstPos + 1]. Two cases: t
+            // above lastPos (folded straight in), or t below firstPos
+            // (folded with +1 phase adjustment).
+            if (t >= last.pos) {
+                const span = (first.pos + 1) - last.pos;
+                const localT = span > 0 ? (t - last.pos) / span : 0;
+                lerpOklchTo(last, first, localT, out);
+                return out;
+            }
+            if (t < first.pos) {
+                const span = (first.pos + 1) - last.pos;
+                const localT = span > 0 ? (t + 1 - last.pos) / span : 0;
+                lerpOklchTo(last, first, localT, out);
+                return out;
+            }
+            // t is in [firstPos, lastPos) — fall through to normal segment
+            // lookup below.
+        } else {
+            t = clamp(t, 0, 1);
+
+            if (t <= stops[0].pos) {
+                out.l = stops[0].l; out.c = stops[0].c; out.h = stops[0].h;
+                return out;
+            }
+
+            const last = stops[n - 1];
+            if (t >= last.pos) {
+                out.l = last.l; out.c = last.c; out.h = last.h;
+                return out;
+            }
         }
 
-        const last = stops[stops.length - 1];
-        if (t >= last.pos) {
-            out.l = last.l; out.c = last.c; out.h = last.h;
-            return out;
-        }
-
-        for (let i = 0; i < stops.length - 1; i++) {
+        for (let i = 0; i < n - 1; i++) {
             if (t >= stops[i].pos && t <= stops[i + 1].pos) {
                 const range = stops[i + 1].pos - stops[i].pos;
                 const localT = range > 0 ? (t - stops[i].pos) / range : 0;
@@ -120,11 +181,19 @@ export class Gradient {
     /**
      * Generate N evenly spaced CSS color strings.
      * Allocates an array — intended for setup, not per-frame use.
+     * In closed mode, uses period spacing (`i / count`) with no duplicated
+     * endpoint — the last color is at `(count-1)/count`, wrap segment implied.
      * @param {number} count
      * @returns {string[]}
      */
     palette(count) {
         const colors = [];
+        if (this.closed) {
+            for (let i = 0; i < count; i++) {
+                colors.push(this.css(i / count));
+            }
+            return colors;
+        }
         for (let i = 0; i < count; i++) {
             const t = count === 1 ? 0.5 : i / (count - 1);
             colors.push(this.css(t));
@@ -137,12 +206,26 @@ export class Gradient {
      * Layout: [l0, c0, h0, l1, c1, h1, ...] — 3 floats per sample.
      * ZERO-GC: caller owns the output array.
      *
+     * In closed mode, uses period spacing (`i / count`) — sample 0 and the
+     * would-be sample at index `count` are the same color; omitting the
+     * duplicate is the point.
+     *
      * @param {Float32Array} out  Pre-allocated, length >= count * 3
      * @param {number} count      Number of samples
      * @returns {Float32Array} Same `out` reference
      */
     sampleArray(out, count) {
         const tmp = this._scratch;
+        if (this.closed) {
+            for (let i = 0; i < count; i++) {
+                this.at(i / count, tmp);
+                const o = i * 3;
+                out[o] = tmp.l;
+                out[o + 1] = tmp.c;
+                out[o + 2] = tmp.h;
+            }
+            return out;
+        }
         for (let i = 0; i < count; i++) {
             const t = count === 1 ? 0.5 : i / (count - 1);
             this.at(t, tmp);
@@ -156,6 +239,9 @@ export class Gradient {
 
     /**
      * Create a Canvas2D linear gradient with N color stops.
+     * In closed mode the sampled positions are period-spaced (`i / resolution`)
+     * and an explicit closing stop is added at t=1 with the first color so
+     * `drawImage`-style tiling butts perfectly.
      * @param {CanvasRenderingContext2D} ctx
      * @param {number} x0  Start X
      * @param {number} y0  Start Y
@@ -166,15 +252,21 @@ export class Gradient {
      */
     toLinear(ctx, x0, y0, x1, y1, resolution = 16) {
         const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+        const denom = this.closed ? resolution : (resolution - 1);
         for (let i = 0; i < resolution; i++) {
-            const t = i / (resolution - 1);
+            const t = i / denom;
             grad.addColorStop(t, this.css(t));
+        }
+        if (this.closed) {
+            grad.addColorStop(1, this.css(0));
         }
         return grad;
     }
 
     /**
      * Create a Canvas2D radial gradient.
+     * In closed mode: period spacing + explicit closing stop at r=1 with
+     * the first color (see `toLinear`).
      * @param {CanvasRenderingContext2D} ctx
      * @param {number} cx  Center X
      * @param {number} cy  Center Y
@@ -184,38 +276,53 @@ export class Gradient {
      */
     toRadial(ctx, cx, cy, r, resolution = 16) {
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        const denom = this.closed ? resolution : (resolution - 1);
         for (let i = 0; i < resolution; i++) {
-            const t = i / (resolution - 1);
+            const t = i / denom;
             grad.addColorStop(t, this.css(t));
+        }
+        if (this.closed) {
+            grad.addColorStop(1, this.css(0));
         }
         return grad;
     }
 
     /**
      * Generate a CSS linear-gradient() string.
+     * In closed mode: period spacing + first color again at 100% so the
+     * CSS output closes visually.
      * @param {number}  [angle=90]       Angle in degrees (90 = left-to-right)
      * @param {number}  [resolution=8]   Number of sampled stops
      * @returns {string}
      */
     toCssLinear(angle = 90, resolution = 8) {
         const stops = [];
+        const denom = this.closed ? resolution : (resolution - 1);
         for (let i = 0; i < resolution; i++) {
-            const t = i / (resolution - 1);
+            const t = i / denom;
             stops.push(`${this.css(t)} ${(t * 100).toFixed(1)}%`);
+        }
+        if (this.closed) {
+            stops.push(`${this.css(0)} 100.0%`);
         }
         return `linear-gradient(${angle}deg, ${stops.join(', ')})`;
     }
 
     /**
      * Generate a CSS radial-gradient() string.
+     * In closed mode: period spacing + closing stop at 100% (see `toCssLinear`).
      * @param {number} [resolution=8]
      * @returns {string}
      */
     toCssRadial(resolution = 8) {
         const stops = [];
+        const denom = this.closed ? resolution : (resolution - 1);
         for (let i = 0; i < resolution; i++) {
-            const t = i / (resolution - 1);
+            const t = i / denom;
             stops.push(`${this.css(t)} ${(t * 100).toFixed(1)}%`);
+        }
+        if (this.closed) {
+            stops.push(`${this.css(0)} 100.0%`);
         }
         return `radial-gradient(circle, ${stops.join(', ')})`;
     }

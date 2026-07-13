@@ -1,7 +1,36 @@
 interface OklchColor { l: number; c: number; h: number; }
 interface GradientStop extends OklchColor { stop?: number; }
+
+/**
+ * Constructor options for {@link Gradient} (v1.2.0+).
+ */
+export interface GradientOptions {
+    /**
+     * Treat the gradient as cyclic. Enables:
+     * - Period spacing on defaults (`i / n` instead of `i / (n − 1)`);
+     * - Period wrap on `at(t)` (`t = t − Math.floor(t)`, then folded to 0 if it
+     *   rounds to exactly 1.0, which it does for any tiny negative t), so any
+     *   float — a raw accumulating animation phase, a negative — is a valid
+     *   position and the returned hue always stays in `[0, 360)`;
+     * - Wrap segment interpolation `[lastPos, firstPos + 1]`;
+     * - Period spacing on `palette` / `sampleArray` samples (no duplicated
+     *   endpoint);
+     * - CSS emitters append the first color again at 100% so the emitted
+     *   gradient closes visually.
+     *
+     * Open-mode behaviour (default) is unchanged, byte-for-byte, from v1.1.0.
+     * @default false
+     */
+    closed?: boolean;
+}
+
 export declare class Gradient {
-    constructor(stops: GradientStop[]);
+    /** Whether the gradient was constructed with `{ closed: true }`. */
+    readonly closed: boolean;
+    /** Sorted internal stops with resolved positions. */
+    readonly stops: ReadonlyArray<OklchColor & { pos: number }>;
+
+    constructor(stops: GradientStop[], opts?: GradientOptions);
     at(t: number, out: OklchColor): OklchColor;
     css(t: number): string;
     palette(count: number): string[];

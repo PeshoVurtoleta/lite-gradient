@@ -1,9 +1,12 @@
 # @zakkster/lite-gradient
 
 [![npm version](https://img.shields.io/npm/v/@zakkster/lite-gradient.svg?style=for-the-badge&color=latest)](https://www.npmjs.com/package/@zakkster/lite-gradient)
+[![sponsor](https://img.shields.io/badge/sponsor-PeshoVurtoleta-ea4aaa.svg?logo=github)](https://github.com/sponsors/PeshoVurtoleta)
+![Zero-GC](https://img.shields.io/badge/Zero--GC-Hot%20Path-00C853?style=for-the-badge&logo=leaf&logoColor=white)
 [![npm bundle size](https://img.shields.io/bundlephobia/minzip/@zakkster/lite-gradient?style=for-the-badge)](https://bundlephobia.com/result?p=@zakkster/lite-gradient)
 [![npm downloads](https://img.shields.io/npm/dm/@zakkster/lite-gradient?style=for-the-badge&color=blue)](https://www.npmjs.com/package/@zakkster/lite-gradient)
 [![npm total downloads](https://img.shields.io/npm/dt/@zakkster/lite-gradient?style=for-the-badge&color=blue)](https://www.npmjs.com/package/@zakkster/lite-gradient)
+![Tree-Shakeable](https://img.shields.io/badge/tree--shakeable-yes-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Types-informational)
 ![Dependencies](https://img.shields.io/badge/dependencies-2-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -125,6 +128,48 @@ ready for canvas/CSS emission.
 
 - **`gradientMonoWarm`** — warm sepia (photography/editorial classic)
 - **`gradientMonoCool`** — cool blue-grey (client-safe neutral)
+
+## 🔄 Closed / cyclic gradients (v1.2.0)
+
+Some gradients are naturally cyclic — hue wheels, rotating conic fills,
+seamless texture tiles. `new Gradient(stops, { closed: true })` promotes
+that from a hand-rolled `t % 1` + duplicate-first-color-at-100% pattern
+into a first-class shape.
+
+```js
+// Three hues at 120° apart, cyclic
+const wheel = new Gradient([
+    { l: 0.65, c: 0.18, h: 0   },
+    { l: 0.65, c: 0.18, h: 120 },
+    { l: 0.65, c: 0.18, h: 240 },
+], { closed: true });
+
+// Raw animation phase — no `phase % 1`, no wrap bookkeeping
+let phase = 0;
+function frame(dt) {
+    phase += dt * 0.0001;
+    wheel.at(phase, out);           // handles any float, positive or negative
+    ctx.fillStyle = toCssOklch(out);
+    // ...
+}
+```
+
+**What closed changes.** Default auto-spacing switches from `i / (n − 1)`
+(endpoint-inclusive) to `i / n` (period): the last stop lands at
+`(n − 1) / n`, and the wrap segment `[lastPos, firstPos + 1]` closes back
+to the first stop. `at(t)` uses `t − Math.floor(t)` instead of a clamp,
+so any float is a valid position. `palette(count)` and `sampleArray()`
+use period spacing (`i / count`) so `count === stops.length` reproduces
+the original stops verbatim.
+
+**CSS emitters close visually.** `toCssLinear` and `toCssRadial` sample
+at period positions and then append the first color again at 100%, so
+CSS `linear-gradient` and `radial-gradient` output tiles seamlessly.
+`toLinear` / `toRadial` do the same for `CanvasGradient`.
+
+**Everything else is untouched.** Open-mode output is byte-identical to
+v1.1.0 — no branch on the hot path when `closed` is false. The 27
+pre-existing tests pass unmodified.
 
 ## 🧪 Benchmark
 

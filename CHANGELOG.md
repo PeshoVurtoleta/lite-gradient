@@ -5,6 +5,96 @@ All notable changes to `@zakkster/lite-gradient` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-07-13
+
+The **closed release**. Cyclic gradients for hue wheels, angle-driven
+palette rotations, seamless tiling — the shape everyone hand-rolls with
+`t % 1` and a duplicate first-color-at-100% gets promoted to a first-class
+constructor option. Backward-compatible additive-only: open-mode output
+is byte-identical to v1.1.0.
+
+### Added — `closed: true` constructor option
+
+`new Gradient(stops, { closed: true })` turns the gradient into a cyclic
+one. The changes cascade through the whole surface:
+
+- **Default spacing.** Auto-positioned stops space at `i / n` (period),
+  not `i / (n − 1)` (endpoint-inclusive). A 3-stop closed gradient anchors
+  at `0`, `1/3`, `2/3`; the wrap segment covers `[2/3, 1]` and closes back
+  to the first stop. Custom `stop` positions are still honoured — the
+  wrap segment then spans `[lastPos, firstPos + 1]`.
+- **`at(t, out)`.** `t = t − Math.floor(t)` replaces the open-mode clamp.
+  Animation loops now drive hue wheels with a raw accumulating phase, no
+  manual mod bookkeeping. Negative `t` wraps too (`Math.floor(-0.25) === -1`
+  → `-0.25 → 0.75`).
+- **Wrap-segment interpolation.** When `t` lands in the wrap span (either
+  side of the boundary), the sampler interpolates `stops[n-1] → stops[0]`
+  via `lerpOklchTo` — same short-arc hue semantics as any other segment.
+- **`palette(count)` / `sampleArray(out, count)`.** Sample at `i / count`
+  (period spacing, no duplicated endpoint). Pass `count === n` to get
+  your original stops back verbatim.
+- **`toCssLinear` / `toCssRadial`.** Same period spacing during sampling,
+  then an explicit closing stop at `100%` with the first color — so
+  `linear-gradient` / `radial-gradient` output visually closes when
+  used as a repeating tile.
+- **`toLinear` / `toRadial` (Canvas).** Same treatment — closing
+  `addColorStop(1, ...)` with the first color. `CanvasGradient` doesn't
+  reveal its stop list, so the emitter is symmetric with the CSS one.
+
+### Added — `readonly closed: boolean` field on Gradient instances
+
+Consumers (e.g. `@zakkster/lite-gradient-studio`'s `formatCssConic`) can
+branch on the closed flag without re-plumbing the constructor argument.
+
+### Guarantees
+
+- **Open-mode paths untouched.** `new Gradient(stops)` — no opts — walks
+  the same code paths as v1.1.0. All 27 pre-existing tests pass unmodified.
+- **Zero-GC preserved on the hot path.** `at(t, out)` still writes into
+  the caller's output object; the wrap-segment branch adds a single
+  subtract-and-compare, no allocations.
+- **No new dependencies.** `lite-color` and `lite-lerp` peers unchanged.
+
+### Notes
+
+- 16 new tests (43 total). Coverage includes: period-spacing defaults,
+  `at(1) === at(0)` identity, raw-accumulating-phase sampling, negative
+  `t` wrap, wrap-segment midpoint, custom-position closed gradients,
+  wrap-boundary continuity (circular-distance metric), palette /
+  sampleArray period spacing, and closing-stop emission on both CSS
+  emitters. Open-mode regression test asserts the old clamp behaviour
+  at `t = 2` and `t = -1`.
+- The typings gain a `GradientOptions` interface, `readonly closed` /
+  `readonly stops` fields on the class, and the extended constructor
+  signature. Existing single-argument usage remains type-compatible.
+- `at()` on a closed gradient with `NaN` phase is undefined behaviour —
+  `Math.floor(NaN) === NaN`, so the wrap arithmetic propagates. Guard
+  at the caller if animation could go non-finite.
+
+
+### Fixed (pre-release, against the 1.2.0 release candidate)
+
+- **`at()` in closed mode could return a hue of 360.** The period wrap is
+  `t = t - Math.floor(t)`, and that expression does **not** always land in
+  `[0, 1)`: for any tiny negative `t` (magnitude below `Number.EPSILON / 2`,
+  about 1.1e-16), `t - (-1)` rounds to exactly `1.0` in float64. `t = 1.0` then
+  falls into the wrap segment at `localT === 1`, which returns the correct
+  *colour* but expresses its hue as **360** rather than 0 — outside the canonical
+  `[0, 360)` range, and enough to break any consumer that divides by 360, indexes
+  on the hue, or bins it into a histogram.
+
+  An accumulating animation phase decrementing through zero produces exactly this
+  input, and `at()` documents negative `t` as a valid position. The closed branch
+  now folds `t >= 1` back to 0. The open path is untouched: it still clamps, and
+  remains byte-identical to v1.1.0 — verified over 3001 samples spanning `t < 0`
+  and `t > 1`, plus `palette`, `sampleArray` and every emitter.
+
+  Same root cause as the out-of-bounds index fixed in `@zakkster/lite-color-lerp`
+  v1.1.0's `sampleColorLUTWrapped`. The two packages share the wrap expression,
+  and shared the bug — the difference is that `Gradient` *interpolates* at the
+  bad value (so it degraded to a non-canonical hue) while the LUT sampler
+  *indexes* with it (so it returned `undefined`).
+
 ## [1.1.0] — 2026-07-03
 
 ### Added — Monochrome
